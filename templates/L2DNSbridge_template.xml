@@ -1,5 +1,0 @@
-<network>
-  <name>{{item.key}}L2DNS</name>
-  <forward mode='bridge'/>
-  <bridge name='{{item.key}}L2DNS'/>
-</network>
