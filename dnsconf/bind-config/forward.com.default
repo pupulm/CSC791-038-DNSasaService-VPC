@@ -1,0 +1,11 @@
+$TTL 86400
+@   IN  SOA    com. root.com. (
+        2011071001  ;Serial
+        10        ;Refresh
+        5        ;Retry
+        10      ;Expire
+        20       ;Minimum TTL
+)
+@	IN  NS		t1a.com.
+@	IN  A		10.10.10.10
+t1a	IN  A		20.20.20.20
