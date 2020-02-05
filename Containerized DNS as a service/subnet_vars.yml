@@ -1,0 +1,31 @@
+---
+subnets:
+  t1_subnet_1: # Tenant name
+    subnet_name: t1_subnet_1
+    vpc_name: t1
+    subnet_range: 41.0.0.0/24
+    vpc_gateway: 41.0.0.1/24
+    dhcp_range: 41.0.0.2,41.0.0.250,12h 
+    
+
+  t1_subnet_2: # Tenant name
+    subnet_name: t1_subnet_2
+    vpc_name: t1
+    subnet_range: 42.0.0.0/24
+    vpc_gateway: 42.0.0.1/24
+    dhcp_range: 42.0.0.2,42.0.0.250,12h
+
+  t2_subnet_1: # Tenant name
+    subnet_name: t2_subnet_1
+    vpc_name: t2
+    subnet_range: 43.0.0.0/24
+    vpc_gateway: 43.0.0.1/24
+    dhcp_range: 43.0.0.2,43.0.0.250,12h
+
+
+  t2_subnet_2: # Tenant name
+    subnet_name: t2_subnet_2
+    vpc_name: t2
+    subnet_range: 44.0.0.0/24
+    vpc_gateway: 44.0.0.1/24
+    dhcp_range: 44.0.0.2,44.0.0.250,12h

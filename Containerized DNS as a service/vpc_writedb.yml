@@ -1,0 +1,40 @@
+---
+- hosts: localhost
+  become: yes
+  vars:
+          provider_namespace: provider_ns
+  vars_files:
+          - vpc_variable.yml
+  tasks:
+          - name: Creating tenant directory in /etc path
+            file:
+                    path: "/etc/tenants"
+                    state: directory
+                    mode: 0775
+                    owner: ece792
+                    group: ece792
+                    recurse: yes
+         
+          - name: Creating directories for each tenant in tenant directory
+            file:
+                    path: "/etc/tenants/{{ item.key }}"
+                    state: directory
+                    mode: 0775
+                    owner: ece792
+                    group: ece792
+                    recurse: yes
+            with_dict: "{{ vpcs }}"
+          
+          - name: Dumping the configuration into json file
+            copy:
+                    content: "{{ item | to_nice_json }}"
+                    dest: "/etc/tenants/{{ item.key }}/{{ item.value.vpc_name }}.json"
+                    owner: ece792
+                    group: ece792
+                    mode: 0775
+            with_dict: "{{ vpcs }}"
+          
+
+          
+
+          

@@ -1,0 +1,14 @@
+$TTL 1D #testing
+@       IN SOA  t1.ece792. root.t1.ece792. (
+                                        2003    ; serial
+                                        1D      ; refresh
+                                        1H      ; retry
+                                        1W      ; expire
+                                        3H )    ; minimum
+
+@	IN  NS		t1.ece792.
+@	IN  A		192.168.230.130
+vm.apidns	IN  NS		apidns.t1.ece792.
+apidns.t1	IN  NS		t1.ece792.
+apidns	IN  A		192.168.230.175
+	IN  A		192.168.230.75

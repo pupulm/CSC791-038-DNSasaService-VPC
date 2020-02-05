@@ -1,0 +1,74 @@
+#!/bin/bash
+
+set -x
+
+# init_config() {
+#   mv /named.conf.default /etc/named.conf
+#   mv /forward.com.default /var/named/forward.com
+#   mkdir /var/named/log
+#   chmod -R 0777 /var/named/log
+#   chown -R named:named /var/named/log
+# }
+
+init_config() {
+  mkdir -p /named
+  chmod -R 0755 /named
+  chown -R named:named /named
+
+  if [ ! -d /named/etc ]; then
+    mkdir /named/etc
+    chmod -R 0755 /named/etc
+    chown -R named:named /named/etc
+
+    mv /etc/named.* /named/etc/
+    mv /named.conf.default /named/etc/named.conf
+  fi
+
+  rm -rf /etc/named
+  ln -sf /named/etc /etc/named
+  ln -sf /named/etc/named.rfc1912.zones /etc/named.rfc1912.zones
+  ln -sf /named/etc/named.root.key /etc/named.root.key
+  ln -sf /named/etc/named.iscdlv.key /etc/named.iscdlv.key
+
+  if [ ! -d /named/var ]; then
+    mkdir -p /named/var/data
+    mkdir -p /named/var/dynamic
+    mv /forward.com.default /named/var/forward.db
+    chown -R named:named /named/var
+  fi
+
+  (   cd /var/named ; mv named.ca named.empty named.localhost named.loopback /named/var/ )
+
+  rm -rf /var/named
+  ln -sf /named/var /var/named
+
+  if [ ! -d /named/log ]; then
+    mkdir /named/log
+    chmod -R 0777 /named/log
+    chown -R root:named /named/log
+  fi
+}
+
+# Main Shell Script
+init_config
+
+if [[ ${1:0:1} = '-' ]]; then
+  EXTRA_ARGS="$@"
+  set --
+elif [[ ${1} == '/usr/sbin/init' ]]; then
+  EXTRA_ARGS="${@:2}"
+  set --
+fi
+
+if [[ -z ${1} ]]; then
+  echo "Starting init service..."
+  sed 's/#PermitRootLogin/PermitRootLogin/' < /etc/ssh/sshd_config > /etc/ssh/sshd_config
+  exec /usr/sbin/init
+  exec 'systemctl restart sshd'
+  # exec /usr/sbin/named -4 -u named -c /named/etc/named.conf -g ${EXTRA_ARGS}
+  
+else
+  exec "$@"
+fi
+
+

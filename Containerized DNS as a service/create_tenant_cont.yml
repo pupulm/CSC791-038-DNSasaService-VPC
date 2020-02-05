@@ -1,0 +1,78 @@
+---
+- hosts: localhost
+  gather_facts: no
+  become: yes
+  vars:
+          packages:
+                  - docker
+          docker_image: tenantimage
+          docker_filepath: /home/ece792/project/DNS-as-a-Service-VPC/containerproject/instanceconf
+
+  vars_files:
+          - ten_cont_vars.yml
+
+  tasks:
+          - debug:
+                  msg: "{{ item.key }}"
+            with_dict: "{{ guests }}"
+          
+          - name: Install packages
+            apt:
+                    name: "{{packages}}"
+
+          - name: Create docker images if it does not exist
+            docker_image:
+                    path: "{{ docker_filepath }}"
+                    name: "{{ docker_image }}"
+                    state: present
+
+          - name: Create and start container for dns
+            docker_container:
+                    name: "{{ item.key }}"
+                    image: "{{ docker_image}}"
+                    state: started
+                    privileged: yes
+                    interactive: yes
+                    tty: yes
+                    detach: yes
+                    #dns_server:
+                    #        - "{{container_subnetip.results[0].stdout}}"
+            with_dict: "{{ guests }}" 
+
+          - name: Create veth pair for bridge and container
+            command: "ip link add {{item.key}}vif1 type veth peer name {{item.key}}vif2"
+            ignore_errors: true
+            with_dict: "{{ guests }}"
+
+          # Attach interface to bridge
+          - name: Attach inteface to bridge
+            command: "brctl addif {{item.value.subnet_name}} {{item.key}}vif2"
+            become: yes
+            ignore_errors: true
+            with_dict: "{{ guests }}"
+
+          # Make the interface up
+          - name: Make the interface attached to bridge up
+            command: "ifconfig {{item.key}}vif2 up"
+            become: yes
+            with_dict: "{{ guests }}"
+
+          # Fetch container process ID
+          - name: Fetch container process ID
+            shell: ip link set {{ item.key }}vif1 netns $(sudo docker inspect -f {%raw%}'{{.State.Pid}}'{%endraw%} "{{ item.key }}")
+            #command: "docker inspect --format {%raw%}'{{.State.Pid}}'{%endraw%} {{item.key}}"
+            #register: container_pid
+            with_dict: "{{ guests }}"
+
+
+          # Assign ip to LC1 container interface
+          - name: Run dhclient
+            command: "docker exec --privileged {{ item.key }} dhclient {{ item.key }}vif1"
+            become: yes
+            ignore_errors: true
+            with_dict: "{{ guests }}"
+
+          # Write to database or run this script seperately from shell
+          #- name: Writing this newly created Subnet to DB
+          #  include_tasks: write_dnscontl3_db.yml
+          #  become: yes
