@@ -1,0 +1,35 @@
+---
+- hosts: localhost
+  gather_facts: no
+  become: yes
+  ignore_errors: yes
+  vars:
+          packages:
+                  - python-libvirt
+                  - python-lxml
+          vm_disk_location: /var/lib/libvirt/images
+          os_image_location: /home/ece792/images/dnstenantvm.img
+          provider_namespace: provider_ns
+  vars_files:
+          - DNS_VM_vars1.yml
+
+  tasks:
+          - name: Dump the configuration of L1 DNS VM into json file
+            file:
+                    path: "/etc/tenants/{{ item.key }}-L1"
+                    state: directory
+                    mode: 0775
+                    owner: ece792
+                    group: ece792
+                    recurse: yes
+            with_dict: "{{ L1 }}"
+          
+          - name: Dumping the configuration into json file
+            copy:
+                    content: "{{ item | to_nice_json }}"
+                    dest: "/etc/tenants/{{ item.key }}-L1/{{ item.key }}-L1.json"
+                    owner: ece792
+                    group: ece792
+                    mode: 0775
+            with_dict: "{{ L1 }}"
+

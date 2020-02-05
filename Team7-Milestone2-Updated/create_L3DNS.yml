@@ -1,0 +1,60 @@
+---
+- hosts: localhost
+  gather_facts: no
+  vars:
+    packages:
+       - python-libvirt
+       - python-lxml
+    vm_disk_location: /var/lib/libvirt/images
+    os_image_location: /home/ece792/images/dnstenantvm.img
+    root_pass: root
+  vars_files:
+       - DNS_VM_vars3.yml
+
+
+  tasks:
+# Get the List of VM Disks
+    - name: Get VM Disks....
+      command: "ls {{vm_disk_location}}"
+      register: disks
+      changed_when: "disks.rc != 0"
+      become: yes
+
+
+# Creating the disk image from central location to boot location 
+    - name: Copy Disk Image to boot location
+      copy:
+        src: "{{os_image_location}}"
+        dest: "{{vm_disk_location}}/{{item.key}}-L3DNS.img"
+      when: item.key not in disks.stdout
+      with_dict: "{{ guests }}"
+      become: yes
+
+    - name: Get list of VMs
+      virt:
+        command: "list_vms"
+      register: existing_vms
+      
+    - name: Define the new VMs
+      virt:
+        name: "{{ item.key }}-L3DNS"
+        command: define
+        xml: "{{ lookup('template','templates/L3DNS_VM_template.xml.j2') }}"
+      when: item.key not in existing_vms.list_vms
+      with_dict: "{{ guests }}"
+      become: yes
+
+    - name: Start VM
+      virt:
+        name: "{{ item.key }}-L3DNS"
+        command: create
+      with_dict: "{{ guests }}" 
+      become: yes
+
+    # Write to database or run this script seperately from shell
+    # - name: Writing this newly created Subnet to DB
+    #  include_tasks: write_dnsvml3_db.yml
+    #  become: yes
+
+    - name: Adding iptables rules in each VM for isolation
+      shell: python VMconf.py

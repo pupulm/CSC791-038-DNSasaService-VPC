@@ -1,0 +1,22 @@
+---
+- hosts: localhost
+  gather_facts: no
+  vars:
+    packages:
+       - python-libvirt
+       - python-lxml
+    vm_disk_location: /var/lib/libvirt/images
+    os_image_location: /home/ece792/images/dnstenantvm.img
+    root_pass: root
+  vars_files:
+       - DNS_VM_vars3.yml
+
+  tasks:
+          - name: Dump the configurations of DNS VM into json file 
+            copy:
+                    content: "{{ item | to_nice_json }}"
+                    dest: "/etc/tenants/{{ item.value.vpc_name }}/{{ item.key }}-L3DNS.json" 
+                    owner: ece792
+                    group: ece792
+                    mode: 0775
+            with_dict: "{{ guests }}"

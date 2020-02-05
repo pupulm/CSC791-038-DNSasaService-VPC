@@ -1,0 +1,14 @@
+$TTL 1D
+@       IN SOA  com root.com. (
+                                        2000    ; serial
+                                        1D      ; refresh
+                                        1H      ; retry
+                                        1W      ; expire
+                                        3H )    ; minimum
+
+@	IN  NS		com.
+@	IN  A		192.168.230.33
+vm.apidns.t1	IN  NS		apidns.t1.com.
+apidns.t1	IN  NS		t1.com.
+vm1.apidns.t1	IN  NS		apidns.t1.com.
+t1	IN  A		192.168.230.149

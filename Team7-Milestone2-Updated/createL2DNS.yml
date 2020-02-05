@@ -1,0 +1,122 @@
+---
+- hosts: localhost
+  gather_facts: no
+  ignore_errors: yes
+  become: yes
+  vars:
+          packages:
+                  - python-libvirt
+                  - python-lxml
+          vm_disk_location: /var/lib/libvirt/images
+          os_image_location: /home/ece792/images/dnstenantvm.img
+          provider_namespace: provider_ns
+  vars_files:
+          - DNS_VM_vars2.yml
+                  
+
+
+  tasks:
+          - name: Creating L2 DNS switch for each vpc
+            command: brctl addbr {{ item.key }}L2DNS
+            with_dict: "{{ dns }}"
+
+          - name: Defining L2DNS network
+            virt_net:
+                    command: define
+                    name: "{{ item.key }}L2DNS"
+                    xml: "{{ lookup('template', 'templates/L2DNSbridge_template.xml') }}"
+            with_dict: "{{ dns }}"
+
+          - name: Starting the L2DNS network
+            virt_net:
+                    command: start
+                    name: "{{ item.key }}L2DNS"
+            with_dict: "{{ dns }}"
+
+          - name: Creating the vethpair to attach bridge to tenant namespace
+            command: ip link add {{ item.key }}L2DNSif1 type veth peer name {{ item.key }}L2DNSif2
+            with_dict: "{{ dns }}"
+
+          - name: Set the bridge in up mode
+            command: ip link set {{ item.key }}L2DNS up
+            with_dict: "{{ dns }}"
+ 
+          - name: Attach vethpair interface to bridge
+            command: brctl addif {{ item.key }}L2DNS {{ item.key }}L2DNSif2
+            with_dict: "{{ dns }}"
+          
+          - name: Attach vethpair interface to namespace
+            command: ip link set {{ item.key }}L2DNSif1 netns {{ item.key }}
+            with_dict: "{{ dns }}"
+
+          - name: Making the interfaces attached to bridge up
+            command: ip link set {{ item.key }}L2DNSif2 up
+            with_dict: "{{ dns }}"
+
+          - name: Making the interfaces attached to namespaces up
+            command: ip netns exec {{ item.key }} ip link set {{ item.key }}L2DNSif1 up
+            with_dict: "{{ dns }}"
+
+          - name: Assign IP to vethpair interface inside vpc namespace
+            command: ip netns exec {{ item.key }} ip addr add {{ item.value.provider_gateway }} dev {{ item.key }}L2DNSif1
+            with_dict: "{{ dns }}"
+
+          - name: Add ip table rules NAT inside vpc namespace for the DNS subnet
+            command: ip netns exec {{ item.key }} iptables -t nat -I POSTROUTING 1 -s {{item.value.DNS_subnetrange}} ! -d {{item.value.DNS_subnetrange}} -j MASQUERADE
+            with_dict: "{{ dns }}"
+
+          - name: Provide DHCP by running DNSMASQ
+            command: ip netns exec {{ item.key }} dnsmasq --interface={{ item.key }}L2DNSif1 --except-interface=lo --bind-interfaces --dhcp-range={{ item.value.dhcp_range }}
+            with_dict: "{{ dns }}"
+            ignore_errors: true
+
+          - name: Adding routes for L2 DNS in provider namespace
+            command: ip netns exec {{ provider_namespace }} ip route add {{ item.value.DNS_subnetrange }} via {{ item.value.vpc_gateway }}
+            with_dict: "{{ dns }}"
+
+          - name: Get the list of VM disks
+            command: ls {{ vm_disk_location }}
+            register: disks
+            changed_when: "disks.rc != 0"
+
+          - name: Copy disk image to boot location
+            copy:
+                    src: "{{ os_image_location }}"
+                    dest: "{{ vm_disk_location }}/{{ item.key }}-L2DNS1.img"
+            when: item.key not in disks.stdout
+            with_dict: "{{ dns }}"
+
+          - name: Get list of VMS
+            virt:
+                    command: "list_vms"
+            register: existing_vms
+
+          - name: Define the new VMS
+            virt:
+                    name: "{{ item.key }}-L2DNS1"
+                    command: define
+                    xml: "{{ lookup('template','templates/L2DNS_VM_template.xml.j2') }}"
+            when: item.key not in existing_vms.list_vms
+            with_dict: "{{ dns }}"
+
+          - name: Clone the created VM for secondary
+            command: virt-clone --original {{ item.key }}-L2DNS1 --name {{ item.key }}-L2DNS2 --auto-clone
+            with_dict: "{{ dns }}"
+            
+          - name: Start the VM
+            virt:
+                    name: "{{ item.key }}-L2DNS1"
+                    command: create
+            with_dict: "{{ dns }}"
+
+          - name: Start the cloned VMs
+            virt:
+                    name: "{{ item.key }}-L2DNS2"
+                    command: create
+            with_dict: "{{ dns }}"
+             
+            #  - name: Writing this newly created DNS VM to DB
+            # include_tasks: write_dnsvml2_db.yml
+                   
+
+

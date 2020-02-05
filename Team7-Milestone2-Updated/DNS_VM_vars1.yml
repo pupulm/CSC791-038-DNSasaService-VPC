@@ -1,0 +1,7 @@
+--- 
+L1:
+        L1dns:
+                DNS_subnetrange: 130.0.0.0/24
+                provider_gateway: 130.0.0.1/24
+                dhcp_range: 130.0.0.2,130.0.0.250,12h
+
