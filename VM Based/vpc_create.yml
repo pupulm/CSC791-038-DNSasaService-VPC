@@ -1,0 +1,51 @@
+---
+- hosts: localhost
+  become: yes
+  vars:
+          provider_namespace: provider_ns
+  vars_files:
+          - vpc_variable.yml
+  tasks:
+          - name: Displaying user input
+            debug:
+                    msg: "{{ vpcs }}" 
+                  
+          - name: Creating tenant namespaces
+            command: ip netns add {{ item.key }}
+            with_dict: "{{ vpcs }}"
+
+          - name: Creating veth pair connecting tenant namespace and provider namespace
+            command: ip link add {{ item.value.vpc_name }}_if1 type veth peer name {{ item.value.vpc_name }}_if2
+            with_dict: "{{ vpcs }}"
+
+          - name: Setting vethpair end into tenant namespace
+            command: ip link set {{ item.value.vpc_name }}_if1 netns {{ item.key }}
+            with_dict: "{{ vpcs }}"
+
+          - name: Setting vethpair end into provider namespace
+            command: ip link set {{ item.value.vpc_name }}_if2 netns {{ provider_namespace }}
+            with_dict: "{{ vpcs }}"
+
+          - name: Making the devices up in tenant namespaces
+            command: ip netns exec {{ item.key}} ip link set {{ item.value.vpc_name }}_if1 up
+            with_dict: "{{ vpcs }}"
+          
+          - name: Making the devices up in provider namespaces
+            command: ip netns exec {{ provider_namespace }} ip link set {{ item.value.vpc_name }}_if2 up
+            with_dict: "{{ vpcs }}"
+
+          - name: Assigning IP address to vethpair end in tenant namespace
+            command: ip netns exec {{ item.key }} ip addr add {{ item.value.vpc_gateway }} dev {{ item.value.vpc_name }}_if1
+            with_dict: "{{ vpcs }}"
+
+          - name: Assigning IP address to vethpair end in provider namespace
+            command: ip netns exec {{ provider_namespace }} ip addr add {{ item.value.provider_gateway }} dev {{ item.value.vpc_name }}_if2
+            with_dict: "{{ vpcs }}"
+
+          - name: Adding default route in tenant namespace
+            command: ip netns exec {{ item.key }} ip route add default via {{ item.value.provider_gateway_ip }}
+            with_dict: "{{ vpcs }}"
+
+          - name: Write this newly created VPC for logging of configuration files
+            include_tasks: vpc_writedb.yml
+

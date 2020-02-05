@@ -1,0 +1,9 @@
+---
+- name: Dump the configurations of DNS VM into json file
+  copy:
+          content: "{{ item | to_nice_json }}"
+          dest: "/etc/tenants/{{ item.key }}/{{ item.key }}-L2DNS1.json"
+          owner: ece792
+          group: ece792
+          mode: 0775
+  with_dict: "{{ dns }}"

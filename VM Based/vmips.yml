@@ -1,0 +1,22 @@
+L1:
+  L1dns-L1: !!python/unicode '192.168.230.33'
+t1:
+  L2:
+  - t1-L2DNS1: !!python/unicode '192.168.230.149'
+  - t1-L2DNS2: !!python/unicode '192.168.230.160'
+  L3:
+  - DNS_T1_S2-L3DNS: !!python/unicode '192.168.230.34'
+  - DNS_T1_S1-L3DNS: !!python/unicode '192.168.230.64'
+  VM:
+  - T1_VM1: !!python/unicode '41.0.0.16'
+  - T1_VM2: !!python/unicode '42.0.0.79'
+t2:
+  L2:
+  - t2-L2DNS1: !!python/unicode '192.168.230.203'
+  - t2-L2DNS2: !!python/unicode '192.168.230.83'
+  L3:
+  - DNS_T2_S2-L3DNS: !!python/unicode '192.168.230.63'
+  - DNS_T2_S1-L3DNS: !!python/unicode '192.168.230.248'
+  VM:
+  - T2_VM1: !!python/unicode '43.0.0.147'
+  - T2_VM2: !!python/unicode '44.0.0.112'

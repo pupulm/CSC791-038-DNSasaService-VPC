@@ -1,0 +1,97 @@
+---
+- hosts: localhost
+  become: yes
+  vars:
+    provider_namespace: provider_ns
+  vars_files: 
+    - subnet_vars.yml
+
+  tasks:
+    - name: Displaying user input
+      debug:
+          msg: "{{subnets}}"
+    
+    # Create a Linux bridge
+    - name: Create Linux Bridge
+      command: "sudo brctl addbr {{item.value.subnet_name}}"
+      with_dict: "{{ subnets }}"
+      ignore_errors: true
+
+  
+    # Set bridge interface up
+    - name: Set Interface of bridges up
+      command: "sudo ip link set dev {{item.value.subnet_name}} up"
+      with_dict: "{{ subnets }}"
+      ignore_errors: true
+
+    # Define bridge
+    - name: Define the bridge network
+      virt_net: 
+        command: define
+        name: "{{item.value.subnet_name}}"
+        xml: "{{lookup('template', 'templates/network_template.xml.j2')}}"
+      with_dict: "{{ subnets }}"
+      ignore_errors: true
+
+    # Start the network
+    - name: Start the bridge network
+      virt_net:
+        command: start
+        name: "{{item.value.subnet_name}}"
+      with_dict: "{{ subnets }}"
+      ignore_errors: true
+   
+    # Create veth pair
+    - name: Create veth pairs
+      command: "sudo ip link add {{item.value.subnet_name}}vif1 type veth peer name {{item.value.subnet_name}}vif2"
+      with_dict: "{{ subnets }}"
+      ignore_errors: true
+      
+
+    # Add vethpair interface to namespace
+    - name: Add vethpair interface to namespace
+      command: "sudo ip link set {{item.value.subnet_name}}vif1 netns {{item.value.vpc_name}}"
+      with_dict: "{{ subnets }}"
+      ignore_errors: true
+      
+
+    # Attach another veth pair interface with bridge
+    - name: Attach another vethpair interface to bridge
+      command: "sudo brctl addif {{item.value.subnet_name}} {{item.value.subnet_name}}vif2"
+      with_dict: "{{ subnets }}"
+      ignore_errors: true
+      
+
+    # Turn hypervisor interface up
+    - name: Turn hypervisor interface up which is connected with bridge
+      command: "sudo ip link set dev {{item.value.subnet_name}}vif2 up"
+      with_dict: "{{ subnets }}"
+      ignore_errors: true
+      
+
+    # Assign ip to vethpair interface inside vpc namespace
+    - name: Make the veth pair interface inside namespace up
+      command: "sudo ip netns exec {{item.value.vpc_name}} ifconfig {{item.value.subnet_name}}vif1 {{item.value.vpc_gateway}} up"
+      with_dict: "{{ subnets }}"
+      ignore_errors: true
+      
+
+    # Add ip table rules NAT inside the vpc namespace for subnet
+    - name: Add ip table rules to NAT inside the vpc namespace for subnet
+      command: "ip netns exec {{item.value.vpc_name}} iptables -t nat -I POSTROUTING 1 -s {{item.value.subnet_range}} ! -d {{item.value.subnet_range}} -j MASQUERADE"
+      with_dict: "{{ subnets }}"
+      ignore_errors: true
+      
+
+   # Provide  DHCP and DNS 
+    - name: Make the interface of subnet to run dhcp server
+      command: "ip netns exec {{item.value.vpc_name}} dnsmasq --interface={{item.value.subnet_name}}vif1 --except-interface=lo --bind-interfaces --dhcp-range={{item.value.dhcp_range}}"
+      with_dict: "{{ subnets }}"
+      ignore_errors: true
+      
+
+    # Write to database or run this script seperately from shell
+    - name: Writing this newly created Subnet to DB
+      include_tasks: write_subnetdb.yml
+      
+

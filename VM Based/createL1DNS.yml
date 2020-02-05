@@ -1,0 +1,100 @@
+---
+- hosts: localhost
+  gather_facts: no
+  become: yes
+  vars:
+          packages:
+                  - python-libvirt
+                  - python-lxml
+          vm_disk_location: /var/lib/libvirt/images
+          os_image_location: /home/ece792/images/dnstenantvm.img
+          provider_namespace: provider_ns
+  vars_files:
+          - DNS_VM_vars1.yml
+
+  tasks:
+          - name: Creating L1 DNS switch for provider DNS
+            command: brctl addbr {{ item.key }} 
+            with_dict: "{{ L1 }}"
+
+          - name: Defining L1DNS network
+            virt_net:
+                    command: define
+                    name: "{{ item.key }}"
+                    xml: "{{ lookup('template', 'templates/L1DNSbridge_template.xml' ) }}"
+            with_dict: "{{ L1 }}"
+
+          - name: Starting the L1DNS network
+            virt_net:
+                    command: start
+                    name: "{{ item.key }}"
+            with_dict: "{{ L1 }}"
+
+          - name: Creating the vethpair to attach bridge to provider namespace
+            command: ip link add {{ item.key }}L1_if1 type veth peer name {{ item.key }}L1_if2
+            with_dict: "{{ L1 }}"
+ 
+          - name: Attach vethpair interface to bridge
+            command: brctl addif {{ item.key }} {{ item.key }}L1_if2
+            with_dict: "{{ L1 }}"
+
+          - name: Attach vethpair interface to provider namespace
+            command: ip link set {{ item.key }}L1_if1 netns {{ provider_namespace }} 
+            with_dict: "{{ L1 }}"  
+
+          - name: Making the bridge up 
+            command: ip link set {{ item.key }} up
+            with_dict: "{{ L1 }}"
+
+          - name: Making the interfaces attached to bridge up
+            command: ip link set {{ item.key}}L1_if2 up
+            with_dict: "{{ L1 }}"
+ 
+          - name: Making the interfaces attached to provider_ns up 
+            command: ip netns exec {{ provider_namespace }} ip link set {{ item.key }}L1_if1 up
+            with_dict: "{{ L1 }}"
+
+          - name: Assign IP to the vethpair interface inside provider_ns
+            command: ip netns exec {{ provider_namespace }} ip addr add {{ item.value.provider_gateway }} dev {{ item.key }}L1_if1
+            with_dict: "{{ L1 }}" 
+
+          - name: Provide DHCP by running DNSMASQ
+            command: ip netns exec {{ provider_namespace }} dnsmasq --interface={{ item.key }}L1_if1 --except-interface=lo --bind-interfaces --dhcp-range={{ item.value.dhcp_range }}
+            with_dict: "{{ L1 }}"
+
+          - name: Get the list of VM disks
+            command: ls {{ vm_disk_location }}
+            register: disks
+            changed_when: "disks.rc != 0"
+         
+          - name: Copy disk image to boot location
+            copy:
+                        src: "{{ os_image_location }}"
+                        dest: "{{ vm_disk_location }}/{{ item.key }}-L1.img"
+            when: item.key not in disks.stdout
+            with_dict: "{{ L1 }}"
+          
+          - name: Get list of the VMs
+            virt:
+                    command: "list_vms"
+            register: existing_vms
+
+          - name: Define the new VM
+            virt:
+                    name: "{{ item.key }}-L1"
+                    command: define
+                    xml: "{{ lookup('template','templates/L1DNS_VM_template.xml.j2') }}"
+            when: item.key not in existing_vms.list_vms
+            with_dict: "{{ L1 }}"
+
+          - name: Start the VM
+            virt:
+                    name: "{{ item.key }}-L1"
+                    command: create
+            with_dict: "{{ L1 }}"
+
+          - name: Writing this newly created L1 DNS VM to DB
+            include_tasks: write_dnsvml1_db.yml
+
+          - name: Adding firewall rules in L1-DNS
+            shell: python L1DNSfirewall.py

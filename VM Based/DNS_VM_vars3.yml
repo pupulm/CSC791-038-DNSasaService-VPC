@@ -1,0 +1,39 @@
+---
+guests:
+        DNS_T1_S1:
+                subnet_name: t1_subnet_1
+                vpc_name: t1
+                os_type: centos7_minimal
+                mem: 512
+                vcpu: 2
+                controller_network: controller_net
+
+        
+        DNS_T1_S2:
+                subnet_name: t1_subnet_2
+                vpc_name: t1
+                os_type: centos7_minimal
+                mem: 512
+                vcpu: 2
+                controller_network: controller_net
+
+        DNS_T2_S1:
+                subnet_name: t2_subnet_1
+                vpc_name: t2
+                os_type: centos7_minimal
+                mem: 512
+                vcpu: 2
+                controller_network: controller_net
+      
+        DNS_T2_S2:
+                subnet_name: t2_subnet_2
+                vpc_name: t2
+                os_type: centos7_minimal
+                mem: 512
+                vcpu: 2
+                controller_network: controller_net
+
+
+
+
+
